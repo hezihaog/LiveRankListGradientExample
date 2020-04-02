@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.android.zh.liveranklistgradientexample.item.RankListItemBinder
 import com.android.zh.liveranklistgradientexample.model.RankListItemModel
+import com.android.zh.liveranklistgradientexample.util.RecyclerViewScrollHelper
 import com.android.zh.liveranklistgradientexample.util.ViewUtils
 import me.drakeet.multitype.Items
 import me.drakeet.multitype.MultiTypeAdapter
@@ -44,7 +45,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setData() {
         val textColorResId = android.R.color.white
-        for (index in 1..20) {
+        for (index in 1..15) {
             mListItems.add(
                 RankListItemModel(
                     index,
@@ -161,16 +162,42 @@ class MainActivity : AppCompatActivity() {
      */
     private inner class TopShadowStrategy(shadowHeight: Float, paint: Paint) :
         ShadowStrategy(shadowHeight, paint) {
+
+        private lateinit var mScrollHelper: RecyclerViewScrollHelper
+        /**
+         * 是否可以绘制渐变
+         */
+        private var isCanDrawShadow: Boolean = false
+
         override fun onDrawOver(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-            val left = 0f
-            val top = 0f
-            val right = parent.width.toFloat()
-            val bottom = shadowHeight
-            val topShadowRect = RectF(left, top, right, bottom)
-            canvas.drawRect(topShadowRect, paint)
+            if (isCanDrawShadow) {
+                val left = 0f
+                val top = 0f
+                val right = parent.width.toFloat()
+                val bottom = shadowHeight
+                val topShadowRect = RectF(left, top, right, bottom)
+                canvas.drawRect(topShadowRect, paint)
+            }
         }
 
         override fun getShader(parent: RecyclerView): Shader {
+            if (!this::mScrollHelper.isInitialized) {
+                mScrollHelper = RecyclerViewScrollHelper()
+                mScrollHelper.attachRecyclerView(
+                    parent,
+                    object : RecyclerViewScrollHelper.CallbackAdapter() {
+                        override fun onScrolledToTop() {
+                            //到了顶部就不能渲染
+                            isCanDrawShadow = false
+                        }
+
+                        override fun onScrolledToUp() {
+                            super.onScrolledToUp()
+                            //向上滚动，列表向下移动，则需要渲染
+                            isCanDrawShadow = true
+                        }
+                    })
+            }
             return run {
                 //渐变起始x，y坐标
                 val x0 = 0f
@@ -203,13 +230,23 @@ class MainActivity : AppCompatActivity() {
      */
     private inner class BottomShadowStrategy(shadowHeight: Float, paint: Paint) :
         ShadowStrategy(shadowHeight, paint) {
+
+        /**
+         * 是否可以绘制渐变
+         */
+        private var isCanDrawShadow: Boolean = true
+
         override fun onDrawOver(canvas: Canvas, parent: RecyclerView, state: RecyclerView.State) {
-            val left = 0f
-            val top = parent.height - shadowHeight
-            val right = parent.width.toFloat()
-            val bottom = parent.height.toFloat()
-            val topShadowRect = RectF(left, top, right, bottom)
-            canvas.drawRect(topShadowRect, paint)
+            //底部渐变，必须指定数量的条目才可以绘制
+            isCanDrawShadow = (parent.adapter?.itemCount ?: 0) > 8
+            if (isCanDrawShadow) {
+                val left = 0f
+                val top = parent.height - shadowHeight
+                val right = parent.width.toFloat()
+                val bottom = parent.height.toFloat()
+                val topShadowRect = RectF(left, top, right, bottom)
+                canvas.drawRect(topShadowRect, paint)
+            }
         }
 
         override fun getShader(parent: RecyclerView): Shader {
